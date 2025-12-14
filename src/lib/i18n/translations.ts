@@ -1,0 +1,163 @@
+export type Locale = "zh" | "en";
+
+export const translations = {
+  zh: {
+    // App Name
+    appName: "知识宝库",
+    // Navigation
+    nav: {
+      home: "首页",
+      myKnowledge: "我的知识库",
+      processingTasks: "正在执行任务",
+    },
+    // Home Page
+    home: {
+      title: "将混乱转化为",
+      titleHighlight: "知识",
+      subtitle: "提取内容精华，构建个人知识库",
+      placeholder: "在这里粘贴你的内容...",
+      characters: "字符",
+      tooShort: "内容不足200字，建议输入更多内容以获得更好的提取效果",
+      tooLong: "内容超过2万字，建议分段处理以获得更好的提取效果",
+      transformButton: "转化为知识",
+      extracting: "提取中...",
+      processing: "正在处理...",
+      success: "处理成功！",
+      knowledgeCaptured: "知识已捕获",
+      addedToDatabase: "刚刚添加到数据库",
+      summary: "摘要",
+      keyInsights: "关键洞察",
+      viewAll: "查看全部",
+    },
+    // Knowledge Page
+    knowledge: {
+      title: "我的知识库",
+      total: "共 {count} 个知识点",
+      cardView: "卡片",
+      listView: "列表",
+      noKnowledge: "还没有知识点",
+      noKnowledgeDesc: "开始创建你的第一个知识点吧！",
+      createKnowledge: "创建知识点",
+      deleteConfirm: "确定要删除这个知识点吗？",
+      deleteSuccess: "删除成功",
+      deleteFailed: "删除失败",
+      today: "今天",
+      yesterday: "昨天",
+      daysAgo: "{days}天前",
+      weeksAgo: "{weeks}周前",
+      monthsAgo: "{months}个月前",
+      yearsAgo: "{years}年前",
+      unnamed: "未命名知识点",
+    },
+    // Settings
+    settings: {
+      title: "设置",
+      description: "配置AI服务提供商和模型",
+      provider: "服务提供商",
+      model: "模型",
+      apiKey: "API密钥",
+      apiKeyPlaceholder: "输入API密钥（可选）",
+      apiKeyHint: "如果不填写，将使用环境变量中的API密钥",
+      apiKeyPrivacy: "注意：API密钥仅保存在浏览器会话中，关闭浏览器后会自动清除，不会永久存储。",
+      cancel: "取消",
+      save: "保存",
+      saved: "已保存",
+      back: "返回",
+      validate: "验证",
+      validating: "验证中...",
+      validateSuccess: "验证成功",
+      validateFailed: "验证失败",
+      validateError: "验证出错",
+      saveError: "保存失败：请先验证API密钥",
+      saveSuccess: "配置已保存",
+    },
+    // Common
+    common: {
+      loading: "加载中...",
+      error: "错误",
+      success: "成功",
+      failed: "失败",
+    },
+  },
+  en: {
+    // App Name
+    appName: "KnowledgeVault",
+    // Navigation
+    nav: {
+      home: "Home",
+      myKnowledge: "My Knowledge",
+      processingTasks: "Processing tasks",
+    },
+    // Home Page
+    home: {
+      title: "Turn Chaos into",
+      titleHighlight: "Knowledge",
+      subtitle: "Extract content essence, build your knowledge base",
+      placeholder: "Paste your content here...",
+      characters: "characters",
+      tooShort: "Content is less than 200 characters. Please add more content for better extraction results.",
+      tooLong: "Content exceeds 20,000 characters. Consider splitting it into sections for better extraction results.",
+      transformButton: "Transform to Knowledge",
+      extracting: "Extracting...",
+      processing: "Processing...",
+      success: "Success!",
+      knowledgeCaptured: "Knowledge Captured",
+      addedToDatabase: "Added to your database just now.",
+      summary: "Summary",
+      keyInsights: "Key Insights",
+      viewAll: "View All",
+    },
+    // Knowledge Page
+    knowledge: {
+      title: "My Knowledge",
+      total: "{count} knowledge points",
+      cardView: "Card",
+      listView: "List",
+      noKnowledge: "No knowledge points yet",
+      noKnowledgeDesc: "Start creating your first knowledge point!",
+      createKnowledge: "Create Knowledge",
+      deleteConfirm: "Are you sure you want to delete this knowledge point?",
+      deleteSuccess: "Deleted successfully",
+      deleteFailed: "Failed to delete",
+      today: "Today",
+      yesterday: "Yesterday",
+      daysAgo: "{days} days ago",
+      weeksAgo: "{weeks} weeks ago",
+      monthsAgo: "{months} months ago",
+      yearsAgo: "{years} years ago",
+      unnamed: "Unnamed Knowledge Point",
+    },
+    // Settings
+    settings: {
+      title: "Settings",
+      description: "Configure AI service provider and model",
+      provider: "Provider",
+      model: "Model",
+      apiKey: "API Key",
+      apiKeyPlaceholder: "Enter API key (optional)",
+      apiKeyHint: "If not provided, will use API key from environment variables",
+      apiKeyPrivacy: "Note: API keys are only stored in browser session and will be cleared when the browser is closed. They are not permanently stored.",
+      cancel: "Cancel",
+      save: "Save",
+      saved: "Saved",
+      back: "Back",
+      validate: "Validate",
+      validating: "Validating...",
+      validateSuccess: "Validation successful",
+      validateFailed: "Validation failed",
+      validateError: "Validation error",
+      saveError: "Save failed: Please validate API key first",
+      saveSuccess: "Configuration saved",
+    },
+    // Common
+    common: {
+      loading: "Loading...",
+      error: "Error",
+      success: "Success",
+      failed: "Failed",
+    },
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.zh;
+

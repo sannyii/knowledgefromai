@@ -1,5 +1,35 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```bash
+# Optional: Default AI Provider (default: gemini)
+# Available: gemini, openai, deepseek, qwen, anthropic
+AI_PROVIDER=gemini
+
+# API Keys (will be used if not set in settings)
+# Get your API key from: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+QWEN_API_KEY=your_qwen_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Optional: Default Model Names (will be used if not set in settings)
+GEMINI_MODEL=gemini-1.5-flash  # Available: gemini-1.5-flash, gemini-1.5-pro
+OPENAI_MODEL=gpt-4o  # Available: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
+DEEPSEEK_MODEL=deepseek-chat  # Available: deepseek-chat, deepseek-coder
+QWEN_MODEL=qwen-turbo  # Available: qwen-turbo, qwen-plus, qwen-max
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022  # Available: claude-3-5-sonnet-20241022, etc.
+
+# Database
+DATABASE_URL="file:./dev.db"
+```
+
+**注意**: 如果没有在设置页面配置 API key 和模型，系统会自动使用环境变量中的值。环境变量优先级低于用户在设置页面中的配置。
+
 ## Getting Started
 
 First, run the development server:

@@ -1,0 +1,19 @@
+Please analyze the following text content and generate a structured knowledge summary.
+
+Requirements:
+1. Generate a concise title (10-20 words, summarizing the core theme)
+2. Generate a concise summary (2-3 sentences, outlining the main content)
+3. Extract 3-5 key points (one sentence each, highlighting important points)
+4. Generate 3 tag keywords (2-4 words each, for quick categorization and retrieval)
+
+Text content:
+{text}
+
+Please return the result strictly in the following JSON format, without any additional explanatory text:
+{
+  "title": "Title content",
+  "summary": "Summary content",
+  "keyPoints": ["Point 1", "Point 2", "Point 3"],
+  "tags": ["Tag 1", "Tag 2", "Tag 3"]
+}
+
