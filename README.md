@@ -88,8 +88,7 @@ npm run dev
 
 If this project helps you build your knowledge fortress, consider buying me a coffee!
 
-<!-- Add your QR code image here -->
-<!-- ![Support QR Code](./public/support-qr.png) -->
+![Support QR Code](./public/support-qr.png)
 
 <div align="center">
 
@@ -195,8 +194,7 @@ npm run dev
 
 如果这个项目帮助你构建了知识城墙，欢迎请我喝杯咖啡！
 
-<!-- 在这里添加你的赞赏二维码 -->
-<!-- ![赞赏二维码](./public/support-qr.png) -->
+![赞赏二维码](./public/support-qr.png)
 
 <div align="center">
 
