@@ -1,66 +1,219 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Environment Variables
+# 🧠 Transform Chaos into Knowledge
 
-Create a `.env.local` file in the root directory with the following variables:
+**Build your knowledge fortress against the information flood**
+
+English | [简体中文](#-将混乱转化为知识)
+
+</div>
+
+---
+
+## 📖 Introduction
+
+In the age of the internet, searching for information was essential—we became masters of search engines. 
+
+Now, as the AI era dawns, the challenge has shifted. We're no longer starved for information; we're drowning in it. 
+
+**The new imperative:** Build your own knowledge fortress to withstand the relentless flood of information.
+
+---
+
+## ✨ Features
+
+### 🔄 Intelligent Structuring
+Transform any chaotic text into a clean, three-part knowledge structure:
+- **Title** — The essence captured in one line
+- **Summary** — Core insights distilled
+- **Key Points** — Actionable takeaways
+
+### 💾 Knowledge Storage
+- Save all your knowledge points locally
+- Tag and categorize for easy retrieval
+- Multiple view modes: Card, List, and Tags
+
+### 🤖 AI-Powered
+- Support for Gemini and DeepSeek APIs
+- Configurable in settings
+- Bring your own API key
+
+---
+
+## 🚧 Roadmap
+
+- [ ] **Knowledge Synthesis** — Summarize and refine your entire knowledge base
+- [ ] **Smart Connections** — Discover relationships between knowledge points
+- [ ] **Export & Share** — Export your knowledge in various formats
+
+> 💡 *The more you use it, the more you know. The more you know, the more valuable your knowledge vault becomes.*
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+
+### Installation
 
 ```bash
-# Optional: Default AI Provider (default: gemini)
-# Available: gemini, openai, deepseek, qwen, anthropic
-AI_PROVIDER=gemini
+# Clone the repository
+git clone https://github.com/sannyii/knowledgefromai.git
 
-# API Keys (will be used if not set in settings)
-# Get your API key from: https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=your_gemini_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-DEEPSEEK_API_KEY=your_deepseek_api_key_here
-QWEN_API_KEY=your_qwen_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Navigate to the project
+cd knowledgefromai
 
-# Optional: Default Model Names (will be used if not set in settings)
-GEMINI_MODEL=gemini-1.5-flash  # Available: gemini-1.5-flash, gemini-1.5-pro
-OPENAI_MODEL=gpt-4o  # Available: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
-DEEPSEEK_MODEL=deepseek-chat  # Available: deepseek-chat, deepseek-coder
-QWEN_MODEL=qwen-turbo  # Available: qwen-turbo, qwen-plus, qwen-max
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022  # Available: claude-3-5-sonnet-20241022, etc.
+# Install dependencies
+npm install
 
-# Database
-DATABASE_URL="file:./dev.db"
-```
+# Initialize the database
+npx prisma migrate dev
 
-**注意**: 如果没有在设置页面配置 API key 和模型，系统会自动使用环境变量中的值。环境变量优先级低于用户在设置页面中的配置。
-
-## Getting Started
-
-First, run the development server:
-
-```bash
+# Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Open `http://localhost:3000` in your browser
+2. Navigate to **Settings**
+3. Enter your Gemini or DeepSeek API key
+4. Click **Validate** then **Save**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 💝 Support
 
-To learn more about Next.js, take a look at the following resources:
+If this project helps you build your knowledge fortress, consider buying me a coffee!
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+<!-- Add your QR code image here -->
+<!-- ![Support QR Code](./public/support-qr.png) -->
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+<div align="center">
 
-## Deploy on Vercel
+*Your support keeps this project growing* ☕
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+</div>
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📄 License
+
+MIT License - feel free to use and modify!
+
+---
+
+<div align="center">
+
+# 🧠 将混乱转化为知识
+
+**构建你的知识城墙，抵御信息洪流**
+
+[English](#-transform-chaos-into-knowledge) | 简体中文
+
+</div>
+
+---
+
+## 📖 简介
+
+过去互联网时代，寻找信息是刚需，我们习惯了搜索引擎。
+
+现在，随着 AI 时代的到来，挑战已经改变。我们不再缺乏信息，而是被信息淹没。
+
+**新的使命：** 构建起自己的知识城墙，来抵御信息洪流。
+
+---
+
+## ✨ 功能特性
+
+### 🔄 智能结构化
+将任何混乱的文本转化为清晰的三段式知识结构：
+- **标题** — 一句话捕捉精髓
+- **摘要** — 核心洞察提炼
+- **要点** — 可行动的收获
+
+### 💾 知识存储
+- 本地存储所有知识点
+- 标签分类，轻松检索
+- 多种视图模式：卡片、列表、标签
+
+### 🤖 AI 驱动
+- 支持 Gemini 和 DeepSeek API
+- 在设置中配置
+- 使用你自己的 API Key
+
+---
+
+## 🚧 开发计划
+
+- [ ] **知识整合** — 总结和提炼整个知识库
+- [ ] **智能关联** — 发现知识点之间的联系
+- [ ] **导出分享** — 多种格式导出知识
+
+> 💡 *用的越多，知道的越多。知道的越多，这个知识宝库就越有用。*
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+- Node.js 18+
+- npm 或 yarn
+
+### 安装步骤
+
+```bash
+# 克隆仓库
+git clone https://github.com/sannyii/knowledgefromai.git
+
+# 进入项目目录
+cd knowledgefromai
+
+# 安装依赖
+npm install
+
+# 初始化数据库
+npx prisma migrate dev
+
+# 启动开发服务器
+npm run dev
+```
+
+### 配置 API
+
+1. 在浏览器中打开 `http://localhost:3000`
+2. 进入 **设置** 页面
+3. 输入你的 Gemini 或 DeepSeek API Key
+4. 点击 **验证** 然后 **保存**
+
+---
+
+## 💝 赞赏支持
+
+如果这个项目帮助你构建了知识城墙，欢迎请我喝杯咖啡！
+
+<!-- 在这里添加你的赞赏二维码 -->
+<!-- ![赞赏二维码](./public/support-qr.png) -->
+
+<div align="center">
+
+*你的支持是项目持续发展的动力* ☕
+
+</div>
+
+---
+
+## 📄 开源协议
+
+MIT License - 自由使用和修改！
+
+---
+
+<div align="center">
+
+**Made with ❤️ for knowledge seekers**
+
+</div>
