@@ -88,7 +88,10 @@ npm run dev
 
 If this project helps you build your knowledge fortress, consider buying me a coffee!
 
-![Support QR Code](./public/support-qr.png)
+<div align="center">
+  <img src="./public/wechat-pay.png" alt="WeChat Pay" width="200" />
+  <img src="./public/alipay.png" alt="Alipay" width="200" />
+</div>
 
 <div align="center">
 
@@ -194,7 +197,10 @@ npm run dev
 
 如果这个项目帮助你构建了知识城墙，欢迎请我喝杯咖啡！
 
-![赞赏二维码](./public/support-qr.png)
+<div align="center">
+  <img src="./public/wechat-pay.png" alt="微信支付" width="200" />
+  <img src="./public/alipay.png" alt="支付宝" width="200" />
+</div>
 
 <div align="center">
 
