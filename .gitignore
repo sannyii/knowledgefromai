@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Prisma SQLite database (keep schema, ignore data)
+prisma/*.db
+prisma/*.db-journal
