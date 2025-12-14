@@ -217,3 +217,16 @@ MIT License - 自由使用和修改！
 **Made with ❤️ for knowledge seekers**
 
 </div>
+
+---
+
+## ⭐ Star History
+
+<a href="https://star-history.com/#sannyii/knowledgefromai&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=sannyii/knowledgefromai&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=sannyii/knowledgefromai&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=sannyii/knowledgefromai&type=Date" />
+ </picture>
+</a>
+
