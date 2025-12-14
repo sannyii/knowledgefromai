@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { BookOpen, Grid3x3, List, Trash2, Calendar, Sparkles, Loader2, Home as HomeIcon, Library } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, VisuallyHidden } from "@/components/ui/dialog";
+import { BookOpen, Grid3x3, List, Trash2, Calendar, Sparkles, Loader2, Home as HomeIcon, Library, Tag } from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { KnowledgeLinkWithBadge } from "@/components/KnowledgeLinkWithBadge";
 import { useProcessing } from "@/lib/processing-context";
+import { KnowledgeCardImage } from "@/components/KnowledgeCardImage";
 
 type KnowledgePoint = {
   id: string;
@@ -20,7 +22,7 @@ type KnowledgePoint = {
   originalText: string;
 };
 
-type ViewMode = "card" | "list";
+type ViewMode = "card" | "list" | "tags";
 
 export default function KnowledgePage() {
   const { t } = useI18n();
@@ -29,6 +31,8 @@ export default function KnowledgePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedKnowledgePoint, setSelectedKnowledgePoint] = useState<KnowledgePoint | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const prevProcessingCountRef = useRef(0);
   const prevKnowledgePointsCountRef = useRef(0);
 
@@ -117,6 +121,30 @@ export default function KnowledgePage() {
     return t.knowledge.yearsAgo.replace("{years}", Math.floor(days / 365).toString());
   };
 
+  // Get all unique tags with counts
+  const getAllTags = () => {
+    const tagCounts = new Map<string, number>();
+    knowledgePoints.forEach(kp => {
+      kp.tags?.forEach(tag => {
+        if (tag && tag.trim()) {
+          const trimmedTag = tag.trim();
+          tagCounts.set(trimmedTag, (tagCounts.get(trimmedTag) || 0) + 1);
+        }
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  // Get filtered knowledge points by tag
+  const getFilteredKnowledgePoints = () => {
+    if (!selectedTag) return knowledgePoints;
+    return knowledgePoints.filter(kp =>
+      kp.tags?.some(tag => tag.trim() === selectedTag)
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Navbar */}
@@ -152,7 +180,7 @@ export default function KnowledgePage() {
             <Button
               variant={viewMode === "card" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setViewMode("card")}
+              onClick={() => { setViewMode("card"); setSelectedTag(null); }}
               className={viewMode === "card" ? "bg-blue-600 text-white" : ""}
             >
               <Grid3x3 className="w-4 h-4 mr-2" />
@@ -161,11 +189,20 @@ export default function KnowledgePage() {
             <Button
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setViewMode("list")}
+              onClick={() => { setViewMode("list"); setSelectedTag(null); }}
               className={viewMode === "list" ? "bg-blue-600 text-white" : ""}
             >
               <List className="w-4 h-4 mr-2" />
               {t.knowledge.listView}
+            </Button>
+            <Button
+              variant={viewMode === "tags" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("tags")}
+              className={viewMode === "tags" ? "bg-blue-600 text-white" : ""}
+            >
+              <Tag className="w-4 h-4 mr-2" />
+              {t.knowledge.tagsView || "Tags"}
             </Button>
           </div>
         </div>
@@ -197,22 +234,39 @@ export default function KnowledgePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Loading Cards for Processing Tasks - shown first, will smoothly transition to content */}
             {Array.from({ length: processingCount }).map((_, index) => (
-              <LoadingCard 
-                key={`loading-${index}`} 
+              <LoadingCard
+                key={`loading-${index}`}
               />
             ))}
             {/* Actual Knowledge Points - with smooth transition in, replacing loading cards */}
             {knowledgePoints.map((kp, index) => (
-              <Card 
-                key={kp.id} 
-                className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-0 slide-in-from-bottom-2 h-auto"
+              <Card
+                key={kp.id}
+                className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-0 slide-in-from-bottom-2 h-auto cursor-pointer group"
                 style={{ animationDelay: `${Math.min(index, processingCount) * 100}ms` }}
+                onClick={() => setSelectedKnowledgePoint(kp)}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg font-semibold pr-2">
+                    <CardTitle className="text-lg font-semibold pr-2 group-hover:text-blue-600 transition-colors">
                       {kp.title || t.knowledge.unnamed}
                     </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(kp.id);
+                      }}
+                      disabled={deletingId === kp.id}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {deletingId === kp.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
                   </div>
                   {/* Tags */}
                   {kp.tags && kp.tags.length > 0 && kp.tags.filter(tag => tag && tag.trim()).length > 0 && (
@@ -257,15 +311,15 @@ export default function KnowledgePage() {
           <div className="space-y-4">
             {/* Loading Cards for Processing Tasks - shown first, will smoothly transition to content */}
             {Array.from({ length: processingCount }).map((_, index) => (
-              <LoadingCard 
-                key={`loading-${index}`} 
+              <LoadingCard
+                key={`loading-${index}`}
                 isList={true}
               />
             ))}
             {/* Actual Knowledge Points - with smooth transition in, replacing loading cards */}
             {knowledgePoints.map((kp, index) => (
-              <Card 
-                key={kp.id} 
+              <Card
+                key={kp.id}
                 className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-0 slide-in-from-bottom-2"
                 style={{ animationDelay: `${Math.min(index, processingCount) * 100}ms` }}
               >
@@ -330,7 +384,175 @@ export default function KnowledgePage() {
             ))}
           </div>
         )}
+
+        {/* Tags View */}
+        {!isLoading && viewMode === "tags" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Tags List */}
+            <div className="lg:col-span-1">
+              <Card className="border-slate-200 shadow-sm sticky top-20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    {t.knowledge.allTags || "All Tags"}
+                  </CardTitle>
+                  <CardDescription>
+                    {(t.knowledge.tagsDescription || `${getAllTags().length} unique tags`).replace("{count}", getAllTags().length.toString())}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="max-h-[calc(100vh-16rem)] overflow-y-auto">
+                  {getAllTags().length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">
+                      {t.knowledge.noTags || "No tags yet"}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {getAllTags().map(({ tag, count }) => (
+                        <button
+                          key={tag}
+                          onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all hover:shadow-md ${selectedTag === tag
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                            : 'bg-white hover:bg-slate-50 border-slate-200'
+                            }`}
+                        >
+                          <span className="font-medium truncate flex-1 text-left">{tag}</span>
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${selectedTag === tag
+                            ? 'bg-blue-700 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                            }`}>
+                            {count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Filtered Knowledge Points */}
+            <div className="lg:col-span-2">
+              {selectedTag ? (
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      {t.knowledge.taggedWith || "Tagged with"}: <span className="text-blue-600">#{selectedTag}</span>
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTag(null)}
+                      className="text-slate-600 hover:text-slate-900"
+                    >
+                      {t.knowledge.clearFilter || "Clear filter"}
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    {getFilteredKnowledgePoints().map((kp) => (
+                      <Card
+                        key={kp.id}
+                        className="border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => setSelectedKnowledgePoint(kp)}
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-2">
+                                <CardTitle className="text-lg font-semibold">
+                                  {kp.title || t.knowledge.unnamed}
+                                </CardTitle>
+                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(kp.createdAt)}
+                                </span>
+                              </div>
+                              {kp.tags && kp.tags.length > 0 && kp.tags.filter(tag => tag && tag.trim()).length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {kp.tags.filter(tag => tag && tag.trim()).map((tag, index) => (
+                                    <span
+                                      key={index}
+                                      className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded ${tag.trim() === selectedTag
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-black text-white'
+                                        }`}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                                {kp.summary}
+                              </p>
+                              {kp.keyPoints.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {kp.keyPoints.slice(0, 3).map((point, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md"
+                                    >
+                                      <Sparkles className="w-3 h-3" />
+                                      {point}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(kp.id);
+                              }}
+                              disabled={deletingId === kp.id}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                            >
+                              {deletingId === kp.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <Tag className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                    {t.knowledge.selectTag || "Select a tag"}
+                  </h3>
+                  <p className="text-slate-500">
+                    {t.knowledge.selectTagDesc || "Click on a tag to see related knowledge points"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Knowledge Card Image Dialog */}
+      <Dialog open={!!selectedKnowledgePoint} onOpenChange={(open) => !open && setSelectedKnowledgePoint(null)}>
+        <DialogContent className="max-w-5xl w-[calc(100%-2rem)] max-h-[95vh] overflow-y-auto p-4 md:p-8" showCloseButton={true}>
+          <VisuallyHidden>
+            <DialogTitle>
+              {selectedKnowledgePoint?.title || t.knowledge.unnamed}
+            </DialogTitle>
+          </VisuallyHidden>
+          {selectedKnowledgePoint && (
+            <KnowledgeCardImage
+              knowledgePoint={selectedKnowledgePoint}
+              onClose={() => setSelectedKnowledgePoint(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -339,9 +561,8 @@ export default function KnowledgePage() {
 function LoadingCard({ isList = false, isTransitioning = false }: { isList?: boolean; isTransitioning?: boolean }) {
   if (isList) {
     return (
-      <Card className={`border-slate-200 shadow-sm overflow-hidden relative transition-all duration-500 ${
-        isTransitioning ? 'opacity-0 scale-95' : 'opacity-100'
-      }`}>
+      <Card className={`border-slate-200 shadow-sm overflow-hidden relative transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100'
+        }`}>
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 bg-[length:200%_100%] animate-gradient-flow" />
         <CardContent className="p-6 relative">
           <div className="space-y-4">
@@ -365,9 +586,8 @@ function LoadingCard({ isList = false, isTransitioning = false }: { isList?: boo
   }
 
   return (
-    <Card className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden relative h-auto ${
-      isTransitioning ? 'opacity-0 scale-95' : 'opacity-100'
-    }`}>
+    <Card className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden relative h-auto ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100'
+      }`}>
       <div className="absolute inset-0 bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 bg-[length:200%_100%] animate-gradient-flow" />
       <CardHeader className="pb-3 relative">
         <div className="h-5 bg-blue-200/50 rounded-md w-2/3 animate-pulse mb-2" />

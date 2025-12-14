@@ -1,39 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDefaultApiKey, getDefaultModel, getDefaultProvider } from "@/lib/ai-service";
-import { AIProvider } from "@/lib/ai-config";
 
+// This endpoint is no longer needed as we don't use environment variables
+// It returns empty values since API keys must be configured in settings/database
 export async function GET(request: NextRequest) {
-  try {
     const { searchParams } = new URL(request.url);
-    const provider = searchParams.get("provider") as AIProvider | null;
+    const provider = searchParams.get("provider");
 
-    // If provider is specified, return its API key
-    if (provider) {
-      const apiKey = getDefaultApiKey(provider);
-      const model = getDefaultModel(provider);
-      return NextResponse.json({
-        apiKey: apiKey || null,
-        model: model || null,
-        provider,
-      });
+    if (!provider) {
+        return NextResponse.json(
+            { error: "Provider parameter is required" },
+            { status: 400 }
+        );
     }
 
-    // Otherwise, return default provider's API key
-    const defaultProvider = getDefaultProvider() || "gemini";
-    const apiKey = getDefaultApiKey(defaultProvider);
-    const model = getDefaultModel(defaultProvider);
-
+    // No environment variables are used for API keys anymore
+    // All API keys must be configured via the settings page and stored in the database
+    // Return empty response - the settings page will handle this gracefully
     return NextResponse.json({
-      apiKey: apiKey || null,
-      model: model || null,
-      provider: defaultProvider,
+        apiKey: null,
+        model: null,
     });
-  } catch (error) {
-    console.error("Error fetching default API key:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch default API key" },
-      { status: 500 }
-    );
-  }
 }
-

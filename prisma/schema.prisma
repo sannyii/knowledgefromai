@@ -29,3 +29,12 @@ model KnowledgePoint {
   tags         String?
   user         User?    @relation(fields: [userId], references: [id])
 }
+
+model AIConfig {
+  id         String   @id @default("default")
+  provider   String   @default("gemini")
+  model      String   @default("gemini-1.5-flash")
+  apiKey     String?
+  isValid    Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+}

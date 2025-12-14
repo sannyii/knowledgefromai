@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type AIProvider = "gemini" | "openai" | "deepseek" | "qwen" | "anthropic";
+export type AIProvider = "gemini" | "openai" | "deepseek" | "qwen" | "anthropic" | "kimi" | "doubao";
 
 export interface ModelConfig {
   id: string;
@@ -51,7 +51,24 @@ export const AI_PROVIDERS: Record<AIProvider, { name: string; models: ModelConfi
       { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet", provider: "anthropic" },
     ],
   },
+  kimi: {
+    name: "Kimi (月之暗面)",
+    models: [
+      { id: "moonshot-v1-8k", name: "Moonshot V1 8K", provider: "kimi" },
+      { id: "moonshot-v1-32k", name: "Moonshot V1 32K", provider: "kimi" },
+      { id: "moonshot-v1-128k", name: "Moonshot V1 128K", provider: "kimi" },
+    ],
+  },
+  doubao: {
+    name: "豆包 (Doubao)",
+    models: [
+      { id: "doubao-lite-4k", name: "Doubao Lite 4K", provider: "doubao" },
+      { id: "doubao-pro-4k", name: "Doubao Pro 4K", provider: "doubao" },
+      { id: "doubao-pro-128k", name: "Doubao Pro 128K", provider: "doubao" },
+    ],
+  },
 };
+
 
 export interface AIConfig {
   provider: AIProvider;

@@ -1,67 +1,80 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 interface MeteorAnimationProps {
   startRef: React.RefObject<HTMLElement | HTMLButtonElement | null>;
   endRef: React.RefObject<HTMLAnchorElement | null>;
+  onComplete?: () => void;
 }
 
-// 计算二次贝塞尔曲线上的点（抛物线）
-function getQuadraticBezierPoint(
+// Particle interface for the animation
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  opacity: number;
+  color: string;
+  trail: Array<{ x: number; y: number; opacity: number }>;
+}
+
+// Easing function for smooth animation
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+// Calculate bezier curve point
+function getBezierPoint(
   t: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number
+  p0: { x: number; y: number },
+  p1: { x: number; y: number },
+  p2: { x: number; y: number }
 ): { x: number; y: number } {
   const mt = 1 - t;
-  const mt2 = mt * mt;
-  const t2 = t * t;
-  
   return {
-    x: mt2 * x1 + 2 * mt * t * x2 + t2 * x3,
-    y: mt2 * y1 + 2 * mt * t * y2 + t2 * y3,
+    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y,
   };
 }
 
 export function MeteorAnimation({
   startRef,
   endRef,
+  onComplete,
 }: MeteorAnimationProps) {
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [endPos, setEndPos] = useState({ x: 0, y: 0 });
-  const [controlPoint, setControlPoint] = useState({ x: 0, y: 0 });
-  const [buttonSize, setButtonSize] = useState({ width: 0, height: 0 });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<'rotating' | 'flying' | 'arriving' | 'done'>('rotating');
-  
-  // 第一阶段：按钮周围的小圆点（带螺旋扩散）
-  const [rotatingDots, setRotatingDots] = useState<Array<{ angle: number; opacity: number; radius: number }>>([]);
-  
-  // 第二阶段：飞行的队列
-  const [flyingDots, setFlyingDots] = useState<Array<{
-    id: number;
-    progress: number;
-    x: number;
-    y: number;
-    opacity: number;
-  }>>([]);
-  
-  // 第三阶段：到达目标后的旋转
-  const [arrivingDots, setArrivingDots] = useState<Array<{
-    id: number;
-    angle: number;
-    radius: number;
-    opacity: number;
-  }>>([]);
-  
-  const animationRef = useRef<number>();
+  const [isMounted, setIsMounted] = useState(false);
+  const animationRef = useRef<number | undefined>(undefined);
   const startTimeRef = useRef<number>(0);
-  const totalDots = 12; // 队列中的点数
-  const arrivalRadius = 25; // 到达目标后的旋转半径
+
+  // Positions
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const endPosRef = useRef({ x: 0, y: 0 });
+  const controlPointRef = useRef({ x: 0, y: 0 });
+  const buttonSizeRef = useRef({ width: 0, height: 0 });
+
+  // Particles
+  const particlesRef = useRef<Particle[]>([]);
+
+  // Animation phases
+  const phaseRef = useRef<'burst' | 'converge' | 'fly' | 'arrive' | 'glow' | 'done'>('burst');
+
+  // Colors for the gradient effect (blue to purple - representing knowledge)
+  const colors = [
+    'rgba(59, 130, 246, 1)',   // Blue
+    'rgba(99, 102, 241, 1)',   // Indigo
+    'rgba(139, 92, 246, 1)',   // Purple
+    'rgba(168, 85, 247, 1)',   // Violet
+  ];
 
   useEffect(() => {
     if (startRef.current && endRef.current) {
@@ -73,193 +86,315 @@ export function MeteorAnimation({
       const endX = endRect.left + endRect.width / 2;
       const endY = endRect.top + endRect.height / 2;
 
-      setStartPos({ x: startX, y: startY });
-      setEndPos({ x: endX, y: endY });
-      setButtonSize({ width: startRect.width, height: startRect.height });
+      startPosRef.current = { x: startX, y: startY };
+      endPosRef.current = { x: endX, y: endY };
+      buttonSizeRef.current = { width: startRect.width, height: startRect.height };
 
-      // 计算控制点，创建向上的美丽弧形
+      // Control point for the arc - higher arc for more dramatic effect
       const midX = (startX + endX) / 2;
-      const midY = Math.min(startY, endY) - Math.abs(endX - startX) * 0.4;
+      const arcHeight = Math.abs(endX - startX) * 0.5 + 100;
+      const midY = Math.min(startY, endY) - arcHeight;
+      controlPointRef.current = { x: midX, y: midY };
 
-      setControlPoint({ x: midX, y: midY });
+      // Initialize particles (representing scattered information)
+      const numParticles = 20;
+      const particles: Particle[] = [];
+      for (let i = 0; i < numParticles; i++) {
+        const angle = (i / numParticles) * Math.PI * 2;
+        const speed = 2 + Math.random() * 3;
+        particles.push({
+          id: i,
+          x: startX,
+          y: startY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 3,
+          opacity: 1,
+          color: colors[i % colors.length],
+          trail: [],
+        });
+      }
+      particlesRef.current = particles;
+
       setIsReady(true);
       startTimeRef.current = Date.now();
-      
-      // 初始化旋转的小圆点（初始半径较小）
-      const initialRadius = Math.max(buttonSize.width, buttonSize.height) * 0.2;
-      const dots = Array.from({ length: 12 }, (_, i) => ({
-        angle: (i * 360) / 12,
-        opacity: 1,
-        radius: initialRadius,
-      }));
-      setRotatingDots(dots);
-      
-      // 初始化飞行队列
-      setFlyingDots(Array.from({ length: totalDots }, (_, i) => ({
-        id: i,
-        progress: 0,
-        x: startX,
-        y: startY,
-        opacity: 0,
-      })));
     }
   }, [startRef, endRef]);
 
   useEffect(() => {
     if (!isReady) return;
 
-    const ROTATION_DURATION = 800; // 第一阶段：旋转一圈的时间（毫秒）
-    const FLY_DURATION = 1500; // 第二阶段：飞行时间（毫秒）
-    const ARRIVAL_ROTATION_DURATION = 600; // 第三阶段：到达后旋转时间（毫秒）
-    const FADE_OUT_DURATION = 400; // 渐隐时间
-    const DOT_DELAY = 80; // 每个点的延迟（毫秒）
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size to full screen
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const BURST_DURATION = 600;      // Particles burst outward (slower)
+    const CONVERGE_DURATION = 700;   // Particles converge back
+    const FLY_DURATION = 1200;       // Fly along the arc (slower)
+    const ARRIVE_DURATION = 500;     // Arrive and orbit
+    const GLOW_DURATION = 600;       // Final glow effect (slower)
 
     const animate = () => {
       const elapsed = Date.now() - startTimeRef.current;
-      
-      // 第一阶段：按钮周围的小圆点旋转并螺旋扩散（斐波那契螺旋效果）
-      if (elapsed < ROTATION_DURATION) {
-        setAnimationPhase('rotating');
-        const rotationProgress = elapsed / ROTATION_DURATION;
-        const currentAngle = rotationProgress * 360;
-        
-        // 计算初始和最终半径（形成螺旋扩散效果）
-        const initialRadius = Math.max(buttonSize.width, buttonSize.height) * 0.15;
-        const finalRadius = Math.max(buttonSize.width, buttonSize.height) * 0.7;
-        
-        // 斐波那契螺旋参数：使用对数螺旋公式 r = a * e^(b * θ)
-        // 简化版本：半径随总角度和进度增长
-        const spiralGrowthRate = 0.15; // 螺旋增长率（黄金比例相关）
-        
-        setRotatingDots(prev => prev.map((dot, i) => {
-          // 每个点的起始角度不同
-          const baseAngle = (i * 360) / 12;
-          const totalAngle = baseAngle + currentAngle;
-          
-          // 计算总旋转圈数（角度转圈数）
-          const totalRotations = totalAngle / 360;
-          
-          // 使用对数螺旋公式：r = r0 * e^(k * θ)
-          // 简化版本：r = r0 * (1 + k * rotations)
-          // 让半径随旋转圈数指数增长，形成螺旋扩散
-          const spiralMultiplier = 1 + spiralGrowthRate * totalRotations * (1 + rotationProgress);
-          
-          // 基础半径随进度线性增长，同时受螺旋因子影响
-          const baseRadius = initialRadius + (finalRadius - initialRadius) * rotationProgress;
-          const currentRadius = baseRadius * spiralMultiplier;
-          
-          return {
-            ...dot,
-            angle: totalAngle,
-            radius: Math.min(currentRadius, finalRadius * 1.2), // 限制最大半径
-          };
-        }));
-      }
-      // 第二阶段：队列飞入
-      else if (elapsed < ROTATION_DURATION + FLY_DURATION + totalDots * DOT_DELAY) {
-        setAnimationPhase('flying');
-        const flyStartTime = ROTATION_DURATION;
-        const flyElapsed = elapsed - flyStartTime;
-        
-        const updatedFlyingDots = Array.from({ length: totalDots }, (_, i) => {
-          const dotStartTime = i * DOT_DELAY;
-          const dotElapsed = flyElapsed - dotStartTime;
-          
-          if (dotElapsed < 0) {
-            // 还没开始
-            return {
-              id: i,
-              x: startPos.x,
-              y: startPos.y,
-              opacity: 0,
-              progress: 0,
-            };
-          } else if (dotElapsed > FLY_DURATION) {
-            // 已经到达，保持可见以便过渡到第三阶段
-            return {
-              id: i,
-              x: endPos.x,
-              y: endPos.y,
-              opacity: 1,
-              progress: 1,
-            };
-          } else {
-            // 飞行中
-            const progress = dotElapsed / FLY_DURATION;
-            const point = getQuadraticBezierPoint(
-              progress,
-              startPos.x,
-              startPos.y,
-              controlPoint.x,
-              controlPoint.y,
-              endPos.x,
-              endPos.y
-            );
-            
-            // 计算透明度：开始和结束时渐隐
-            let opacity = 1;
-            if (progress < 0.1) {
-              opacity = progress / 0.1;
-            } else if (progress > 0.9) {
-              opacity = (1 - progress) / 0.1;
-            }
-            
-            return {
-              id: i,
-              x: point.x,
-              y: point.y,
-              opacity,
-              progress,
-            };
-          }
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const startPos = startPosRef.current;
+      const endPos = endPosRef.current;
+      const controlPoint = controlPointRef.current;
+      const particles = particlesRef.current;
+
+      // Phase 1: Burst - particles explode outward (scattered information)
+      if (elapsed < BURST_DURATION) {
+        phaseRef.current = 'burst';
+        const progress = elapsed / BURST_DURATION;
+
+        particles.forEach((p, i) => {
+          // Move outward
+          const burstRadius = 60 * easeOutCubic(progress);
+          const angle = (i / particles.length) * Math.PI * 2;
+
+          p.x = startPos.x + Math.cos(angle) * burstRadius;
+          p.y = startPos.y + Math.sin(angle) * burstRadius;
+          p.opacity = 1;
+
+          // Add trail
+          if (p.trail.length > 5) p.trail.shift();
+          p.trail.push({ x: p.x, y: p.y, opacity: 0.6 });
         });
-        
-        setFlyingDots(updatedFlyingDots);
-      }
-      // 第三阶段：到达后旋转一圈并渐隐
-      else if (elapsed < ROTATION_DURATION + FLY_DURATION + totalDots * DOT_DELAY + ARRIVAL_ROTATION_DURATION + FADE_OUT_DURATION) {
-        setAnimationPhase('arriving');
-        const arrivalStartTime = ROTATION_DURATION + FLY_DURATION + totalDots * DOT_DELAY;
-        const arrivalElapsed = elapsed - arrivalStartTime;
-        
-        if (arrivalElapsed < ARRIVAL_ROTATION_DURATION) {
-          // 旋转阶段
-          const rotationProgress = arrivalElapsed / ARRIVAL_ROTATION_DURATION;
-          const currentAngle = rotationProgress * 360;
-          
-          setArrivingDots(Array.from({ length: totalDots }, (_, i) => ({
-            id: i,
-            angle: (i * 360) / totalDots + currentAngle,
-            radius: arrivalRadius + (i % 3) * 3,
-            opacity: 1,
-          })));
-        } else {
-          // 渐隐阶段
-          const fadeProgress = (arrivalElapsed - ARRIVAL_ROTATION_DURATION) / FADE_OUT_DURATION;
-          setArrivingDots(prev => {
-            if (prev.length === 0) {
-              // 如果还没有初始化，先初始化
-              return Array.from({ length: totalDots }, (_, i) => ({
-                id: i,
-                angle: (i * 360) / totalDots + 360,
-                radius: arrivalRadius + (i % 3) * 3,
-                opacity: 1 - fadeProgress,
-              }));
-            }
-            return prev.map(dot => ({
-              ...dot,
-              opacity: 1 - fadeProgress,
-            }));
+
+        // Draw particles with glow
+        particles.forEach(p => {
+          // Draw trail
+          p.trail.forEach((t, i) => {
+            const trailOpacity = (i / p.trail.length) * 0.5 * p.opacity;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, p.size * 0.6, 0, Math.PI * 2);
+            ctx.fillStyle = p.color.replace('1)', `${trailOpacity})`);
+            ctx.fill();
           });
+
+          // Draw particle with glow
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color.replace('1)', `${p.opacity})`);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        });
+      }
+      // Phase 2: Converge - particles come back together (organizing information)
+      else if (elapsed < BURST_DURATION + CONVERGE_DURATION) {
+        phaseRef.current = 'converge';
+        const progress = (elapsed - BURST_DURATION) / CONVERGE_DURATION;
+        const eased = easeInOutQuad(progress);
+
+        particles.forEach((p, i) => {
+          // Move back toward center
+          const angle = (i / particles.length) * Math.PI * 2;
+          const startRadius = 60;
+          const currentRadius = startRadius * (1 - eased);
+
+          p.x = startPos.x + Math.cos(angle) * currentRadius;
+          p.y = startPos.y + Math.sin(angle) * currentRadius;
+
+          // Shrink trail
+          if (p.trail.length > 3) p.trail.shift();
+          p.trail.push({ x: p.x, y: p.y, opacity: 0.4 });
+        });
+
+        // Draw converging particles
+        particles.forEach(p => {
+          p.trail.forEach((t, i) => {
+            const trailOpacity = (i / p.trail.length) * 0.3;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, p.size * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = p.color.replace('1)', `${trailOpacity})`);
+            ctx.fill();
+          });
+
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (1 - progress * 0.3), 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        });
+
+        // Draw central glow as particles converge
+        if (progress > 0.5) {
+          const glowSize = 20 * (progress - 0.5) * 2;
+          const gradient = ctx.createRadialGradient(
+            startPos.x, startPos.y, 0,
+            startPos.x, startPos.y, glowSize
+          );
+          gradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)');
+          gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+          ctx.beginPath();
+          ctx.arc(startPos.x, startPos.y, glowSize, 0, Math.PI * 2);
+          ctx.fillStyle = gradient;
+          ctx.fill();
         }
-      } else {
-        setAnimationPhase('done');
+      }
+      // Phase 3: Fly - consolidated energy flies along arc (knowledge in transit)
+      else if (elapsed < BURST_DURATION + CONVERGE_DURATION + FLY_DURATION) {
+        phaseRef.current = 'fly';
+        const progress = (elapsed - BURST_DURATION - CONVERGE_DURATION) / FLY_DURATION;
+        const eased = easeInOutQuad(progress);
+
+        // Calculate position along bezier curve
+        const pos = getBezierPoint(eased, startPos, controlPoint, endPos);
+
+        // Create comet effect with multiple layers
+        const numTrailPoints = 15;
+
+        // Draw comet trail
+        for (let i = numTrailPoints; i >= 0; i--) {
+          const trailProgress = Math.max(0, eased - (i * 0.02));
+          const trailPos = getBezierPoint(trailProgress, startPos, controlPoint, endPos);
+          const trailOpacity = ((numTrailPoints - i) / numTrailPoints) * 0.8;
+          const trailSize = 8 + (numTrailPoints - i) * 0.5;
+
+          const gradient = ctx.createRadialGradient(
+            trailPos.x, trailPos.y, 0,
+            trailPos.x, trailPos.y, trailSize
+          );
+          gradient.addColorStop(0, `rgba(139, 92, 246, ${trailOpacity})`);
+          gradient.addColorStop(0.5, `rgba(99, 102, 241, ${trailOpacity * 0.5})`);
+          gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+          ctx.beginPath();
+          ctx.arc(trailPos.x, trailPos.y, trailSize, 0, Math.PI * 2);
+          ctx.fillStyle = gradient;
+          ctx.fill();
+        }
+
+        // Draw main comet head
+        ctx.shadowColor = 'rgba(139, 92, 246, 1)';
+        ctx.shadowBlur = 25;
+
+        const headGradient = ctx.createRadialGradient(
+          pos.x, pos.y, 0,
+          pos.x, pos.y, 12
+        );
+        headGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        headGradient.addColorStop(0.3, 'rgba(168, 85, 247, 1)');
+        headGradient.addColorStop(0.7, 'rgba(99, 102, 241, 0.8)');
+        headGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = headGradient;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Sparkle particles around the comet
+        const time = elapsed * 0.01;
+        for (let i = 0; i < 6; i++) {
+          const sparkleAngle = time + (i * Math.PI / 3);
+          const sparkleRadius = 15 + Math.sin(time * 2 + i) * 5;
+          const sparkleX = pos.x + Math.cos(sparkleAngle) * sparkleRadius;
+          const sparkleY = pos.y + Math.sin(sparkleAngle) * sparkleRadius;
+          const sparkleOpacity = 0.5 + Math.sin(time * 3 + i) * 0.3;
+
+          ctx.beginPath();
+          ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${sparkleOpacity})`;
+          ctx.fill();
+        }
+      }
+      // Phase 4: Arrive - orbit around destination (knowledge settling)
+      else if (elapsed < BURST_DURATION + CONVERGE_DURATION + FLY_DURATION + ARRIVE_DURATION) {
+        phaseRef.current = 'arrive';
+        const progress = (elapsed - BURST_DURATION - CONVERGE_DURATION - FLY_DURATION) / ARRIVE_DURATION;
+
+        // Orbiting particles
+        const numOrbit = 8;
+        const orbitRadius = 25 * (1 - progress * 0.5);
+
+        for (let i = 0; i < numOrbit; i++) {
+          const angle = (i / numOrbit) * Math.PI * 2 + progress * Math.PI * 2;
+          const x = endPos.x + Math.cos(angle) * orbitRadius;
+          const y = endPos.y + Math.sin(angle) * orbitRadius;
+          const size = 4 * (1 - progress * 0.5);
+
+          ctx.shadowColor = colors[i % colors.length];
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fillStyle = colors[i % colors.length];
+          ctx.fill();
+        }
+
+        // Central glow growing
+        const glowSize = 30 * (1 - progress * 0.3);
+        const gradient = ctx.createRadialGradient(
+          endPos.x, endPos.y, 0,
+          endPos.x, endPos.y, glowSize
+        );
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+        gradient.addColorStop(0.3, 'rgba(139, 92, 246, 0.7)');
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+        ctx.beginPath();
+        ctx.arc(endPos.x, endPos.y, glowSize, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      // Phase 5: Glow - final pulse effect (knowledge crystallized)
+      else if (elapsed < BURST_DURATION + CONVERGE_DURATION + FLY_DURATION + ARRIVE_DURATION + GLOW_DURATION) {
+        phaseRef.current = 'glow';
+        const progress = (elapsed - BURST_DURATION - CONVERGE_DURATION - FLY_DURATION - ARRIVE_DURATION) / GLOW_DURATION;
+
+        // Expanding ring
+        const ringRadius = 20 + progress * 40;
+        const ringOpacity = 1 - progress;
+
+        ctx.strokeStyle = `rgba(139, 92, 246, ${ringOpacity * 0.8})`;
+        ctx.lineWidth = 3 * (1 - progress);
+        ctx.beginPath();
+        ctx.arc(endPos.x, endPos.y, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Central glow fading
+        const glowSize = 25 * (1 - progress * 0.5);
+        const glowOpacity = 1 - progress;
+
+        const gradient = ctx.createRadialGradient(
+          endPos.x, endPos.y, 0,
+          endPos.x, endPos.y, glowSize
+        );
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${glowOpacity})`);
+        gradient.addColorStop(0.5, `rgba(139, 92, 246, ${glowOpacity * 0.5})`);
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+        ctx.beginPath();
+        ctx.arc(endPos.x, endPos.y, glowSize, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+      // Done
+      else {
+        phaseRef.current = 'done';
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
         }
+        if (onComplete) {
+          onComplete();
+        }
         return;
       }
-      
+
       animationRef.current = requestAnimationFrame(animate);
     };
 
@@ -270,170 +405,29 @@ export function MeteorAnimation({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isReady, startPos, endPos, controlPoint, totalDots, buttonSize]);
+  }, [isReady, onComplete]);
 
-  if (!isReady || startPos.x === 0) return null;
+  // Handle mounting for Portal
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
-  return (
-    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-      <style>{`
-        @keyframes pulse-glow {
-          0%, 100% {
-            opacity: 0.4;
-            transform: translate(-50%, -50%) scale(0.8);
-          }
-          50% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1.2);
-          }
-        }
-        @keyframes pulse-shadow {
-          0%, 100% {
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
-          }
-          50% {
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.9), 0 0 50px rgba(59, 130, 246, 0.5);
-          }
-        }
-      `}</style>
+  if (!isReady || !isMounted) return null;
 
-      {/* 起始位置（按钮）闪烁效果 */}
-      {isReady && startPos.x !== 0 && (
-        <>
-          {/* 外层光晕 */}
-          <div
-            className="absolute rounded-full"
-            style={{
-              left: `${startPos.x}px`,
-              top: `${startPos.y}px`,
-              width: '80px',
-              height: '80px',
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0) 70%)',
-              animation: 'pulse-glow 1s ease-in-out infinite, pulse-shadow 1s ease-in-out infinite',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* 内层核心 */}
-          <div
-            className="absolute rounded-full"
-            style={{
-              left: `${startPos.x}px`,
-              top: `${startPos.y}px`,
-              transform: 'translate(-50%, -50%)',
-              width: '20px',
-              height: '20px',
-              background: 'rgba(59, 130, 246, 0.8)',
-              boxShadow: '0 0 10px rgba(59, 130, 246, 0.9)',
-              animation: 'pulse-glow 1s ease-in-out infinite',
-              pointerEvents: 'none',
-            }}
-          />
-        </>
-      )}
-
-      {/* 目标位置（知识链接）闪烁效果 */}
-      {isReady && endPos.x !== 0 && (
-        <>
-          {/* 外层光晕 */}
-          <div
-            className="absolute rounded-full"
-            style={{
-              left: `${endPos.x}px`,
-              top: `${endPos.y}px`,
-              width: '70px',
-              height: '70px',
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0) 70%)',
-              animation: 'pulse-glow 1s ease-in-out infinite, pulse-shadow 1s ease-in-out infinite',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* 内层核心 */}
-          <div
-            className="absolute rounded-full"
-            style={{
-              left: `${endPos.x}px`,
-              top: `${endPos.y}px`,
-              transform: 'translate(-50%, -50%)',
-              width: '18px',
-              height: '18px',
-              background: 'rgba(59, 130, 246, 0.8)',
-              boxShadow: '0 0 10px rgba(59, 130, 246, 0.9)',
-              animation: 'pulse-glow 1s ease-in-out infinite',
-              pointerEvents: 'none',
-            }}
-          />
-        </>
-      )}
-
-      {/* 第一阶段：按钮周围旋转的小圆点（螺旋扩散） */}
-      {animationPhase === 'rotating' && rotatingDots.map((dot, i) => {
-        const radian = (dot.angle * Math.PI) / 180;
-        const x = startPos.x + Math.cos(radian) * dot.radius;
-        const y = startPos.y + Math.sin(radian) * dot.radius;
-        
-        return (
-          <div
-            key={`rotating-${i}`}
-            className="absolute rounded-full"
-            style={{
-              width: '4px',
-              height: '4px',
-              left: `${x}px`,
-              top: `${y}px`,
-              transform: 'translate(-50%, -50%)',
-              background: 'rgba(59, 130, 246, 1)',
-              boxShadow: `0 0 4px rgba(96,165,250,0.8)`,
-              opacity: dot.opacity,
-            }}
-          />
-        );
-      })}
-
-      {/* 第二阶段：飞行的队列 */}
-      {animationPhase === 'flying' && flyingDots.map((dot) => {
-        if (dot.opacity === 0) return null;
-        
-        return (
-          <div
-            key={`flying-${dot.id}`}
-            className="absolute rounded-full"
-            style={{
-              width: '4px',
-              height: '4px',
-              left: `${dot.x}px`,
-              top: `${dot.y}px`,
-              transform: 'translate(-50%, -50%)',
-              background: 'rgba(59, 130, 246, 1)',
-              boxShadow: `0 0 4px rgba(96,165,250,0.8)`,
-              opacity: dot.opacity,
-            }}
-          />
-        );
-      })}
-
-      {/* 第三阶段：到达目标后旋转一圈并渐隐 */}
-      {animationPhase === 'arriving' && arrivingDots.map((dot) => {
-        const radian = (dot.angle * Math.PI) / 180;
-        const x = endPos.x + Math.cos(radian) * dot.radius;
-        const y = endPos.y + Math.sin(radian) * dot.radius;
-        
-        return (
-          <div
-            key={`arriving-${dot.id}`}
-            className="absolute rounded-full"
-            style={{
-              width: '4px',
-              height: '4px',
-              left: `${x}px`,
-              top: `${y}px`,
-              transform: 'translate(-50%, -50%)',
-              background: 'rgba(59, 130, 246, 1)',
-              boxShadow: `0 0 4px rgba(96,165,250,0.8)`,
-              opacity: dot.opacity,
-            }}
-          />
-        );
-      })}
-    </div>
+  const canvasElement = (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none"
+      style={{
+        zIndex: 2147483647,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+      }}
+    />
   );
+
+  return createPortal(canvasElement, document.body);
 }

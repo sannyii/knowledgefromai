@@ -33,38 +33,35 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = useState<string>("");
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
 
-  // Load default API key from environment variables on mount
+  // Load configuration from database on mount
   useEffect(() => {
-    const loadDefaultApiKey = async () => {
+    const loadConfig = async () => {
       try {
-        // If user has saved an API key, use it
-        if (config.apiKey) {
-          setApiKey(config.apiKey);
-          setIsLoadingDefaults(false);
-          return;
-        }
-
-        // Otherwise, try to load from environment variables
-        const response = await fetch(`/api/default-api-key?provider=${config.provider || "gemini"}`);
+        // Load from database only - no environment variable fallback
+        const response = await fetch("/api/ai-config");
         if (response.ok) {
           const data = await response.json();
-          if (data.apiKey) {
-            setApiKey(data.apiKey);
+          if (data.provider) {
+            setLocalProvider(data.provider);
           }
-          // Also update model if available from env
-          if (data.model && !config.model) {
+          if (data.model) {
             setLocalModel(data.model);
+          }
+          // If database config has a valid API key, mark as validated
+          if (data.hasApiKey && data.isValid) {
+            setValidationStatus("success");
           }
         }
       } catch (error) {
-        console.error("Failed to load default API key:", error);
+        console.error("Failed to load configuration:", error);
       } finally {
         setIsLoadingDefaults(false);
       }
     };
 
-    loadDefaultApiKey();
+    loadConfig();
   }, []); // Only run on mount
+
 
   // Sync local state with config when config changes externally (e.g., from another tab or after save)
   // But don't interfere with user's current editing
@@ -180,12 +177,29 @@ export default function SettingsPage() {
     }
 
     try {
-      // Save all configuration (provider, model, and apiKey)
+      // Save to database via API
+      const response = await fetch("/api/ai-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: localProvider,
+          model: localModel,
+          apiKey: keyToSave || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save");
+      }
+
+      // Also update context for client-side usage
       setConfig({
         provider: localProvider,
         model: localModel,
         apiKey: keyToSave || undefined,
       });
+
       setSaved(true);
       setSaveError("");
       setTimeout(() => setSaved(false), 2000);

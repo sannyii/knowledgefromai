@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPromptTemplate, formatPrompt, Locale } from "@/lib/prompts";
-import { callAIService, getDefaultModel, getDefaultProvider } from "@/lib/ai-service";
+import { callAIService } from "@/lib/ai-service";
 import { AIConfig, AIProvider } from "@/lib/ai-config";
 
 export async function POST(req: Request) {
     try {
-        const { text, locale = "zh", provider, model, apiKey } = await req.json();
+        const { text, locale = "zh" } = await req.json();
 
         if (!text || text.length < 10) {
             return NextResponse.json(
@@ -15,17 +15,26 @@ export async function POST(req: Request) {
             );
         }
 
-        // Only use environment variables for configuration
-        const defaultProvider = getDefaultProvider() || "gemini";
-        const finalProvider = (provider as AIProvider) || defaultProvider;
-        const defaultModel = getDefaultModel(finalProvider) || "gemini-1.5-flash";
-        const finalModel = model || defaultModel;
+        // Get configuration from database only - no environment variable fallback
+        const dbConfig = await prisma.aIConfig.findUnique({
+            where: { id: "default" },
+        });
+
+        // Check if we have a valid configuration
+        if (!dbConfig || !dbConfig.apiKey || !dbConfig.isValid) {
+            return NextResponse.json(
+                { error: "No API key configured. Please configure an API key in settings." },
+                { status: 400 }
+            );
+        }
 
         const aiConfig: AIConfig = {
-            provider: finalProvider,
-            model: finalModel,
-            // apiKey will be read from environment variables in callAIService
+            provider: dbConfig.provider as AIProvider,
+            model: dbConfig.model,
+            apiKey: dbConfig.apiKey,
         };
+
+
 
         // Use prompt template based on locale
         const promptTemplate = getPromptTemplate((locale as Locale) || "zh");

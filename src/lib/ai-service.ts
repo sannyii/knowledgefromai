@@ -1,6 +1,37 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AIProvider, AIConfig } from "./ai-config";
 
+// Timeout constants
+const VALIDATION_TIMEOUT_MS = 30000; // 30 seconds for validation
+const API_CALL_TIMEOUT_MS = 120000; // 120 seconds for actual API calls (summarization can take time)
+
+/**
+ * Helper function to fetch with timeout
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      throw new Error(`Request timeout after ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  }
+}
+
 // Valid Gemini models (without "models/" prefix for SDK usage)
 // These should match the models in ai-config.tsx
 const VALID_GEMINI_MODELS = [
@@ -18,12 +49,12 @@ function normalizeGeminiModel(model: string): string {
   // Remove "models/" or "gmodels/" prefix if present
   // SDK expects just the model name like "gemini-3-pro-preview" or "gemini-1.5-flash"
   let normalized = model.replace(/^(models|gmodels)\//, "");
-  
+
   // Check if normalized model matches a valid model
   if (VALID_GEMINI_MODELS.includes(normalized)) {
     return normalized; // Return without "models/" prefix for SDK
   }
-  
+
   // If invalid, return default model
   console.warn(`Invalid Gemini model "${model}", using default "gemini-1.5-flash"`);
   return "gemini-1.5-flash";
@@ -44,66 +75,119 @@ export async function validateAPIKey(
         await aiModel.generateContent(testPrompt);
         return true;
       case "openai":
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+        const openaiResponse = await fetchWithTimeout(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: testPrompt }],
+              max_tokens: 5,
+            }),
           },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: testPrompt }],
-            max_tokens: 5,
-          }),
-        });
+          VALIDATION_TIMEOUT_MS
+        );
         return openaiResponse.ok;
       case "deepseek":
-        const deepseekResponse = await fetch("https://api.deepseek.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+        // DeepSeek API - using /chat/completions endpoint (compatible with both /v1 and without)
+        const deepseekResponse = await fetchWithTimeout(
+          "https://api.deepseek.com/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: testPrompt }],
+              max_tokens: 5,
+            }),
           },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: testPrompt }],
-            max_tokens: 5,
-          }),
-        });
+          VALIDATION_TIMEOUT_MS
+        );
         return deepseekResponse.ok;
       case "qwen":
-        const qwenResponse = await fetch("https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+        const qwenResponse = await fetchWithTimeout(
+          "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              input: {
+                messages: [{ role: "user", content: testPrompt }],
+              },
+              parameters: {
+                max_tokens: 5,
+              },
+            }),
           },
-          body: JSON.stringify({
-            model,
-            input: {
-              messages: [{ role: "user", content: testPrompt }],
-            },
-            parameters: {
-              max_tokens: 5,
-            },
-          }),
-        });
+          VALIDATION_TIMEOUT_MS
+        );
         return qwenResponse.ok;
       case "anthropic":
-        const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
+        const anthropicResponse = await fetchWithTimeout(
+          "https://api.anthropic.com/v1/messages",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: 5,
+              messages: [{ role: "user", content: testPrompt }],
+            }),
           },
-          body: JSON.stringify({
-            model,
-            max_tokens: 5,
-            messages: [{ role: "user", content: testPrompt }],
-          }),
-        });
+          VALIDATION_TIMEOUT_MS
+        );
         return anthropicResponse.ok;
+      case "kimi":
+        const kimiResponse = await fetchWithTimeout(
+          "https://api.moonshot.cn/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: testPrompt }],
+              max_tokens: 5,
+            }),
+          },
+          VALIDATION_TIMEOUT_MS
+        );
+        return kimiResponse.ok;
+      case "doubao":
+        const doubaoResponse = await fetchWithTimeout(
+          "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: testPrompt }],
+              max_tokens: 5,
+            }),
+          },
+          VALIDATION_TIMEOUT_MS
+        );
+        return doubaoResponse.ok;
       default:
         return false;
     }
@@ -136,53 +220,33 @@ export async function callAIService(
       return callQwen(prompt, apiKey, config.model);
     case "anthropic":
       return callAnthropic(prompt, apiKey, config.model);
+    case "kimi":
+      return callKimi(prompt, apiKey, config.model);
+    case "doubao":
+      return callDoubao(prompt, apiKey, config.model);
     default:
       throw new Error(`Unsupported AI provider: ${config.provider}`);
   }
 }
 
-export function getDefaultApiKey(provider: AIProvider): string | undefined {
-  switch (provider) {
-    case "gemini":
-      return process.env.GEMINI_API_KEY;
-    case "openai":
-      return process.env.OPENAI_API_KEY;
-    case "deepseek":
-      return process.env.DEEPSEEK_API_KEY;
-    case "qwen":
-      return process.env.QWEN_API_KEY;
-    case "anthropic":
-      return process.env.ANTHROPIC_API_KEY;
-    default:
-      return undefined;
-  }
+export function getDefaultApiKey(_provider: AIProvider): string | undefined {
+  // Environment variables are no longer used
+  // API keys must be configured in the database via settings
+  return undefined;
 }
 
-export function getDefaultModel(provider: AIProvider): string | undefined {
-  switch (provider) {
-    case "gemini":
-      const geminiModel = process.env.GEMINI_MODEL;
-      return geminiModel ? normalizeGeminiModel(geminiModel) : undefined;
-    case "openai":
-      return process.env.OPENAI_MODEL;
-    case "deepseek":
-      return process.env.DEEPSEEK_MODEL;
-    case "qwen":
-      return process.env.QWEN_MODEL;
-    case "anthropic":
-      return process.env.ANTHROPIC_MODEL;
-    default:
-      return undefined;
-  }
+export function getDefaultModel(_provider: AIProvider): string | undefined {
+  // Environment variables are no longer used
+  // Models must be configured in the database via settings
+  return undefined;
 }
 
 export function getDefaultProvider(): AIProvider | undefined {
-  const envProvider = process.env.AI_PROVIDER;
-  if (envProvider && ["gemini", "openai", "deepseek", "qwen", "anthropic"].includes(envProvider)) {
-    return envProvider as AIProvider;
-  }
+  // Environment variables are no longer used
+  // Provider must be configured in the database via settings
   return undefined;
 }
+
 
 async function callGemini(
   prompt: string,
@@ -192,26 +256,26 @@ async function callGemini(
   try {
     // Normalize model name to ensure it's valid
     const normalizedModel = normalizeGeminiModel(model);
-    
+
     console.log(`[Gemini API] Using model: ${normalizedModel}`);
-    
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const aiModel = genAI.getGenerativeModel({ model: normalizedModel });
-    
+
     console.log(`[Gemini API] Calling generateContent...`);
     const result = await aiModel.generateContent(prompt);
     const response = await result.response;
-    
+
     if (!response) {
       throw new Error("No response from Gemini API");
     }
-    
+
     const text = response.text();
     console.log(`[Gemini API] Successfully received response`);
     return text;
   } catch (error: any) {
     console.error(`[Gemini API Error] Model: ${model}, Error:`, error);
-    
+
     // Provide more detailed error information
     if (error?.message?.includes("404")) {
       throw new Error(
@@ -220,14 +284,14 @@ async function callGemini(
         `Valid models: ${VALID_GEMINI_MODELS.join(", ")}`
       );
     }
-    
+
     if (error?.message?.includes("403")) {
       throw new Error(
         `Access denied (403) for Gemini model "${model}". ` +
         `Please check your API key permissions.`
       );
     }
-    
+
     // Re-throw with original error message if it's already informative
     throw new Error(
       `Gemini API error: ${error?.message || String(error)}`
@@ -240,26 +304,42 @@ async function callOpenAI(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    }),
-  });
+  try {
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+        }),
+      },
+      API_CALL_TIMEOUT_MS
+    );
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI API error: ${error.error?.message || response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`OpenAI API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[OpenAI API Error]", error);
+    throw new Error(`OpenAI API failed: ${error?.message || String(error)}`);
   }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "";
 }
 
 async function callDeepSeek(
@@ -267,26 +347,43 @@ async function callDeepSeek(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    }),
-  });
+  try {
+    // Using the correct DeepSeek API endpoint (without /v1)
+    const response = await fetchWithTimeout(
+      "https://api.deepseek.com/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+        }),
+      },
+      API_CALL_TIMEOUT_MS
+    );
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`DeepSeek API error: ${error.error?.message || response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`DeepSeek API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[DeepSeek API Error]", error);
+    throw new Error(`DeepSeek API failed: ${error?.message || String(error)}`);
   }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "";
 }
 
 async function callQwen(
@@ -294,30 +391,46 @@ async function callQwen(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const response = await fetch("https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      input: {
-        messages: [{ role: "user", content: prompt }],
+  try {
+    const response = await fetchWithTimeout(
+      "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          input: {
+            messages: [{ role: "user", content: prompt }],
+          },
+          parameters: {
+            temperature: 0.7,
+          },
+        }),
       },
-      parameters: {
-        temperature: 0.7,
-      },
-    }),
-  });
+      API_CALL_TIMEOUT_MS
+    );
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Qwen API error: ${error.message || response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`Qwen API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.output?.choices?.[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[Qwen API Error]", error);
+    throw new Error(`Qwen API failed: ${error?.message || String(error)}`);
   }
-
-  const data = await response.json();
-  return data.output?.choices?.[0]?.message?.content || "";
 }
 
 async function callAnthropic(
@@ -325,26 +438,128 @@ async function callAnthropic(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  try {
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      },
+      API_CALL_TIMEOUT_MS
+    );
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Anthropic API error: ${error.error?.message || response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`Anthropic API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || "";
+  } catch (error: any) {
+    console.error("[Anthropic API Error]", error);
+    throw new Error(`Anthropic API failed: ${error?.message || String(error)}`);
   }
+}
 
-  const data = await response.json();
-  return data.content?.[0]?.text || "";
+async function callKimi(
+  prompt: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
+  try {
+    const response = await fetchWithTimeout(
+      "https://api.moonshot.cn/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+        }),
+      },
+      API_CALL_TIMEOUT_MS
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`Kimi API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[Kimi API Error]", error);
+    throw new Error(`Kimi API failed: ${error?.message || String(error)}`);
+  }
+}
+
+async function callDoubao(
+  prompt: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
+  try {
+    const response = await fetchWithTimeout(
+      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+        }),
+      },
+      API_CALL_TIMEOUT_MS
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorMessage;
+      } catch {
+        // Use statusText if parsing fails
+      }
+      throw new Error(`Doubao API error (${response.status}): ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || "";
+  } catch (error: any) {
+    console.error("[Doubao API Error]", error);
+    throw new Error(`Doubao API failed: ${error?.message || String(error)}`);
+  }
 }
 
