@@ -7,7 +7,9 @@
 [English](./README.md) | 简体中文
 
 </div>
-
+<div align="center">
+  <img src="./public/chaosisladder.png.png" alt="chaosisladder" width="100%" />
+</div>
 ---
 
 ## 📖 简介
