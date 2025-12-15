@@ -8,7 +8,7 @@ English | [简体中文](./README.zh-CN.md)
 
 </div>
 <div align="center">
-  <img src="./public/chaosisladder.png.png" alt="chaosisladder" width="100%" />
+  <img src="./public/chaosisladder.png" alt="chaosisladder" width="100%" />
 </div>
 
 ---

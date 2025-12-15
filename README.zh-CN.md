@@ -8,7 +8,7 @@
 
 </div>
 <div align="center">
-  <img src="./public/chaosisladder.png.png" alt="chaosisladder" width="100%" />
+  <img src="./public/chaosisladder.png" alt="chaosisladder" width="100%" />
 </div>
 ---
 
